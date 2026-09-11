@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+
+# Datasets and trained models are local artifacts, not committed (see README)
+detection/data/
+detection/models/
