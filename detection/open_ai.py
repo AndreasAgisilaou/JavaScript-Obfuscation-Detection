@@ -28,6 +28,9 @@ DEFAULT_DATASET = "dataset_v1"
 MODEL_NAME = "gpt-4o-mini"
 MAX_TOKENS = 16000  # Safe limit for the model's input
 CHUNK_SIZE = 3000  # Characters per chunk sent to the model
+CHUNK_OVERLAP = 200  # Characters repeated at the start of each chunk after
+                      # the first, so a pattern straddling a chunk boundary
+                      # isn't split in half between two chunks
 RETRY_LIMIT = 3
 RETRY_WAIT_SECONDS = 60
 
@@ -84,19 +87,23 @@ def get_llm_prediction(script_text, api_key, model=MODEL_NAME, max_tokens=MAX_TO
                 return "Error"
 
 
-def classify_file(file_path, api_key, model=MODEL_NAME, chunk_size=CHUNK_SIZE, max_tokens=MAX_TOKENS):
+def classify_file(file_path, api_key, model=MODEL_NAME, chunk_size=CHUNK_SIZE,
+                   chunk_overlap=CHUNK_OVERLAP, max_tokens=MAX_TOKENS):
     """Reads a file and returns the majority-vote LLM verdict across chunks
     ('Obfuscated' or 'NonObfuscated'), or None if every chunk failed (the
     caller should leave the file unresolved rather than guess)."""
     with open(file_path, 'r', encoding='utf-8', errors='ignore') as file:
         text = file.read().strip()
 
+    step = chunk_size - chunk_overlap
     predictions = []
-    for i in range(0, len(text), chunk_size):
+    for i in range(0, len(text), step):
         chunk = text[i:i + chunk_size]
         prediction = get_llm_prediction(chunk, api_key, model=model, max_tokens=max_tokens)
         if prediction != "Error":
             predictions.append(prediction)
+        if i + chunk_size >= len(text):
+            break
 
     if not predictions:
         return None

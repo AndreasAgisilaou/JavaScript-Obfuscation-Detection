@@ -17,7 +17,8 @@ evaluation.
 /openai/classify resolves whatever /sort couldn't: it classifies every file
 in detection/data/sorted/<dataset>/unidentified/ with an OpenAI chat model
 and moves each into obfuscated/ or non_obfuscated/ based on the verdict.
-That's its only job, so it takes just `dataset`, `api_key`, and `model`.
+That's its only job, so it takes just `dataset`, `model`, and an
+`X-OpenAI-Api-Key` header.
 
 Run with (from the repo root, with reload support):
     uvicorn detection.main:app --reload
@@ -30,7 +31,7 @@ import shutil
 from enum import Enum
 from typing import List, Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
@@ -282,7 +283,9 @@ def classify_with_openai(
     dataset: UnsortedDatasetName = Query(
         ..., description="Dataset folder name under detection/data/unsorted/ (its sorted/<dataset>/unidentified/ files will be resolved)"
     ),
-    api_key: str = Query(..., description="OpenAI API key, used only for this request and not persisted"),
+    api_key: str = Header(
+        ..., alias="X-OpenAI-Api-Key", description="OpenAI API key, used only for this request and not persisted"
+    ),
     model: str = Query("gpt-4o-mini", description="OpenAI chat model to use"),
 ):
     dataset = dataset.value

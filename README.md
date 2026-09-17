@@ -38,7 +38,7 @@ Training uses each model's built-in defaults (no exposed hyperparameters) and al
 pip install -r detection/requirements.txt
 ```
 
-`open_ai.py` (and the `/openai/classify` API endpoint) needs an OpenAI API key. It targets the legacy `openai<1.0` SDK, which `detection/requirements.txt` pins to `0.28.1` (the last release before the 1.0 rewrite). The key is passed per-request (`api_key`), never stored.
+`open_ai.py` (and the `/openai/classify` API endpoint) needs an OpenAI API key. It targets the legacy `openai<1.0` SDK, which `detection/requirements.txt` pins to `0.28.1` (the last release before the 1.0 rewrite). The key is passed per-request (as the `X-OpenAI-Api-Key` header on the API endpoint), never stored.
 
 ## Running a script directly
 
@@ -74,7 +74,7 @@ Each also takes an optional `test_dataset` (folder under `detection/data/test/`,
 **Sorting** (tag `sorting`) — the two-step pipeline described above.
 
 - `POST /sort` — takes `dataset` (folder under `detection/data/unsorted/`) plus three optional model-name dropdowns — `random_forest_model`, `xgboost_model_name`, `neural_network_model` — each populated from that algorithm's saved models; setting one opts that method into the vote. At least 2 of the 3 must be set. Classifies every `.js` file in `detection/data/unsorted/<dataset>/` and copies each into `detection/data/sorted/<dataset>/obfuscated|non_obfuscated/` only if **every** selected method agrees, otherwise into `unidentified/`. Files are copied, not moved — the originals stay in `unsorted`.
-- `POST /openai/classify` — takes `dataset` (same dropdown as `/sort`), `api_key` (used only for that request, never persisted — note it's part of the URL since it's a query parameter, so avoid this endpoint if the API is exposed beyond local use), and `model`. Classifies every file in `detection/data/sorted/<dataset>/unidentified/` and **moves** it into `obfuscated/` or `non_obfuscated/`; a file is left in `unidentified/` only if every chunk of it fails to get a response from OpenAI.
+- `POST /openai/classify` — takes `dataset` (same dropdown as `/sort`) and `model` as query parameters, plus the OpenAI key as an `X-OpenAI-Api-Key` request header (used only for that request, never persisted — sent as a header rather than a query parameter so it doesn't end up in the URL, server access logs, or browser history). Classifies every file in `detection/data/sorted/<dataset>/unidentified/` and **moves** it into `obfuscated/` or `non_obfuscated/`; a file is left in `unidentified/` only if every chunk of it fails to get a response from OpenAI.
 
 **Other**
 
@@ -85,3 +85,12 @@ These endpoints run synchronously and block until they finish — training, sort
 ## Outputs
 
 Trained models (and, for the neural network, its scaler) are written to `detection/models/<algo>/`. Sorted files are copied to `detection/data/sorted/<dataset>/`. None of these — nor the dataset files under `detection/data/` — are committed to the repo.
+
+## Running tests
+
+```
+pip install -r detection/requirements-dev.txt
+pytest
+```
+
+Covers the pure feature-extraction functions in `detection/features.py` and `detection/naural_network.py` (entropy, keyword frequency, encoding-pattern detection, etc.) and the chunk-overlap logic in `detection/open_ai.py`'s `classify_file()`. No dataset files or API keys are needed — everything under `tests/` runs against inline strings and temp files.
